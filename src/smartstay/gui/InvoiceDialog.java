@@ -8,14 +8,21 @@ import smartstay.model.Guest;
 import smartstay.model.Invoice;
 import smartstay.model.Reservation;
 import smartstay.model.Room;
+import smartstay.util.InvoicePdfWriter;
 
 import javax.swing.*;
+import javax.swing.filechooser.FileNameExtensionFilter;
 import java.awt.*;
+import java.io.File;
+import java.io.IOException;
 
 public class InvoiceDialog extends JDialog {
 
+    private final Invoice invoice;
+
     public InvoiceDialog(Window owner, Invoice invoice) {
         super(owner, "Invoice", ModalityType.APPLICATION_MODAL);
+        this.invoice = invoice;
         setLayout(new BorderLayout());
         getContentPane().setBackground(Theme.PAGE_BACKGROUND);
 
@@ -30,16 +37,41 @@ public class InvoiceDialog extends JDialog {
         body.add(amountSection(invoice));
         add(body, BorderLayout.CENTER);
 
+        RoundedButton downloadButton = new RoundedButton("Download as PDF", Icons.invoice(Color.WHITE), Theme.SUCCESS);
+        downloadButton.addActionListener(e -> onDownload());
         RoundedButton closeButton = new RoundedButton("Close", Theme.NAVY);
         closeButton.addActionListener(e -> dispose());
-        JPanel footer = new JPanel();
+        JPanel footer = new JPanel(new FlowLayout(FlowLayout.CENTER, 10, 10));
         footer.setBackground(Theme.PAGE_BACKGROUND);
+        footer.add(downloadButton);
         footer.add(closeButton);
         add(footer, BorderLayout.SOUTH);
 
         setMinimumSize(new Dimension(480, 300));
         pack();
         setLocationRelativeTo(owner);
+    }
+
+    private void onDownload() {
+        JFileChooser chooser = new JFileChooser();
+        chooser.setSelectedFile(new File("Invoice_" + invoice.getReservation().getBookingId() + ".pdf"));
+        chooser.setFileFilter(new FileNameExtensionFilter("PDF files (*.pdf)", "pdf"));
+        int result = chooser.showSaveDialog(this);
+        if (result != JFileChooser.APPROVE_OPTION) {
+            return;
+        }
+        File file = chooser.getSelectedFile();
+        if (!file.getName().toLowerCase().endsWith(".pdf")) {
+            file = new File(file.getParentFile(), file.getName() + ".pdf");
+        }
+        try {
+            InvoicePdfWriter.write(invoice, file.toPath());
+            JOptionPane.showMessageDialog(this, "Invoice saved to:\n" + file.getAbsolutePath(),
+                    "Download complete", JOptionPane.INFORMATION_MESSAGE);
+        } catch (IOException ex) {
+            JOptionPane.showMessageDialog(this, "Could not save the PDF: " + ex.getMessage(),
+                    "Download failed", JOptionPane.ERROR_MESSAGE);
+        }
     }
 
     private JPanel buildHeader(Reservation reservation) {
